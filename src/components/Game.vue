@@ -35,6 +35,7 @@ export default {
       startMaxY:window.screen.availHeight + 300,//最大Y位置
       roundT:10000,//转一圈所需时间
       speed:30,//速度
+      monsters:[],//当前关卡的所有怪物对象
     };
   },
   mounted: function() {
@@ -54,6 +55,20 @@ export default {
         this.musicState = false;
       }
     },
+    canvasClick(ev){
+        let e = ev || event;
+        console.log(e);
+        if(this.monsters.length > 0){
+            let flag = true;
+            this.monsters.forEach(item => {
+                if(flag){
+                    if((e.x > item._x && e.x < (item._x + item._width)) && (e.y > item._y && e.y < (item._y + item._height))){
+                        console.log('点钟了');
+                    }
+                }
+            })
+        }
+    },
     initGamePage(){
         let gameCavans = document.getElementById('game');
         gameCavans.width = document.documentElement.clientWidth;
@@ -66,7 +81,7 @@ export default {
                 img.src = './static/images/monster1.png';
                 img.onload = function (){
                     jc.start(a.canvas);
-                    jc.image(img,-100,-100,109,114).id(a.id);
+                    jc.image(img,-100,-100,109,114).id(a.id).level(2);
                     jc.start(option.canvas,true);
                 }
             },
@@ -77,7 +92,7 @@ export default {
                 img.src = './static/images/monster2.png';
                 img.onload = function (){
                     jc.start(a.canvas);
-                    jc.image(img,-100,-100,109,113).id(a.id);
+                    jc.image(img,-100,-100,109,113).id(a.id).level(2);
                     jc.start(option.canvas,true);
                 }
             },
@@ -88,7 +103,7 @@ export default {
                 img.src = './static/images/monster3.png';
                 img.onload = function (){
                     jc.start(a.canvas);
-                    jc.image(img,-100,-100,107,129).id(a.id);
+                    jc.image(img,-100,-100,107,129).id(a.id).level(2);
                     jc.start(option.canvas,true);
                 }
             },
@@ -99,12 +114,28 @@ export default {
                 img.src = './static/images/monster4.png';
                 img.onload = function (){
                     jc.start(a.canvas);
-                    jc.image(img,-100,-100,125,110).id(a.id);
+                    jc.image(img,-100,-100,125,110).id(a.id).level(2);
                     jc.start(option.canvas,true);
                 }
             },
         };
-        // this.monster.mon1({canvas:'game'});
+        gameCavans.addEventListener('touchstart',(ex) => {
+            let es = ex || event;
+            let e = {
+                x:es.changedTouches[0].pageX,
+                y:es.changedTouches[0].pageY,
+            }
+            if(this.monsters.length > 0){
+                let flag = true;
+                this.monsters.forEach(item => {
+                    if(flag){
+                        if((e.x > item._x && e.x < (item._x + item._width)) && (e.y > item._y && e.y < (item._y + item._height))){
+                            item._die();
+                        }
+                    }
+                })
+            }
+        })
         this.creatNum(1);
     },
     creatNum (num) {
@@ -121,11 +152,105 @@ export default {
         for(let i = 0;i < this.arrNum[this.chapterIndex];i++){
             let random = Math.floor(Math.random() * 4) + 1;
             this.monster['mon' + random]({canvas: 'game',id: 'mon' + i + this.chapterIndex});
-            this.initMonsterMove({obj:'mon' + i + this.chapterIndex});
+            this.initMonsterMove({obj:'mon' + i + this.chapterIndex,type:random});
         }
     },
     initMonsterMove(option){
-        
+        let changeNum = ((this.startMaxX - this.startMinX) + (this.startMaxY - this.startMinY)) * 2 / (this.roundT / this.speed);
+        setTimeout(() => {
+            let monster = jc('#' + option.obj);
+            let _this = this;
+            let xy = this.getRandomXY();
+            monster._type = option.type;
+            monster.__x = xy.x;
+            monster.__y = xy.y;
+            monster._x = xy.x;
+            monster._y = xy.y;
+            monster._changeNum = changeNum;//每次更新改变的位置大小
+            monster._R = 300;//转动的半径
+            monster._Ang = 200;//转动的角度
+            monster._run = function (obj) {
+                // this.__x = obj.getRandomXY().x;
+                // this.__y= obj.getRandomXY().y;
+                if(this.__x <= obj.startMaxX && this.__y== obj.startMinY && this.__x > obj.startMinX){
+                    this.__x = this.__x - this._changeNum;
+                    if(this.__x < obj.startMinX) this.__x = obj.startMinX;
+                } else if(this.__x == obj.startMinX && this.__y< obj.startMaxY){
+                    this.__y= this.__y+ this._changeNum;
+                    if(this.__y> obj.startMaxY) this.__y= obj.startMaxY;
+                } else if(this.__x < obj.startMaxX && this.__y== obj.startMaxY){
+                    this.__x = this.__x + this._changeNum;
+                    if(this.__x > obj.startMaxX) this.__x = obj.startMaxX;
+                } else if(this.__y<= obj.startMaxY && this.__x == obj.startMaxX){
+                    this.__y= this.__y- this._changeNum;
+                    if(this.__y< obj.startMinY) this.__y= obj.startMinY;
+                }
+                this._Ang = this._Ang + 3;
+                // console.log(this._Ang)
+                let x = this.__x - this._R * Math.cos(this._Ang * Math.PI / 180);
+                let y = this.__y - this._R * Math.sin(this._Ang * Math.PI / 180);
+                // console.log(this)
+                monster.animate({x:x,y:y},1);
+                // obj.monsters.forEach((item,index) => {
+                //     if(item.optns.id == option.obj){
+                //         obj.monsters[index] = monster;
+                //     }
+                // });
+            };
+            monster._runTnterval = setInterval(() => {
+                monster._run(_this);
+            },this.speed);
+            monster._die = function (obj) {
+                clearInterval(this._runTnterval);
+                this.del();
+                let dieImgSrc = '';
+                let width = 0,height = 0;
+                switch (this._type) {
+                    case 1:
+                        dieImgSrc = './static/images/monster11.png';
+                        width = 180,height = 138;
+                        break;
+                    case 2:
+                        dieImgSrc = './static/images/monster12.png';
+                        width = 146,height = 84;
+                        break;
+                    case 3:
+                        dieImgSrc = './static/images/monster13.png';
+                        width = 103,height = 94;
+                        break;
+                    case 4:
+                        dieImgSrc = './static/images/monster14.png';
+                        width = 92,height = 107;
+                        break;
+                    default:
+                        break;
+                };
+                let img = new Image();
+                img.src = dieImgSrc;
+                img.onload = () => {
+                    jc.start('game');
+                    jc.image(img,this._x,this._y,width,height).id('die' + this.optns.id).level(1);
+                    jc.start('game',true);
+                };
+                setTimeout(() => {
+                    let timeDie = 2000,cycle = 30,opacity = 0;
+                    let dieInterval = setInterval(() => {
+                        opacity += 1/(2000/30);
+                        if(opacity >= 1){
+                            clearInterval(dieInterval);
+                            jc('#' + 'die' + this.optns.id).del();
+                        } else{
+                            jc('#' + 'die' + this.optns.id).opacity(1 - opacity);
+                        }
+                    },30);
+                }, 200);
+            };
+            this.monsters.push(monster);
+            // console.log(this.monsters);
+            
+        }, 500);
+    },
+    getRandomXY(){
         let random = Math.floor(Math.random() * 4) + 1;
         let x = 0, y = 0;
         switch (random) { 
@@ -148,36 +273,10 @@ export default {
             default:
                 break;
         }
-        let changeNum = ((this.startMaxX - this.startMinX) + (this.startMaxY - this.startMinY)) * 2 / (this.roundT / this.speed);
-        setTimeout(() => {
-            let monster = jc('#' + option.obj);
-            let _this = this;
-            monster.__x = x;
-            monster.__y = y;
-            monster._x = x;
-            monster._y = y;
-            monster._changeNum = changeNum;
-            monster._run = function (obj) {
-                console.log(this)
-                if(this._x <= obj.startMaxX && this._y == obj.startMinY && this._x > obj.startMinX){
-                    this._x = this._x - this._changeNum;
-                    if(this._x < obj.startMinX) this._x = obj.startMinX;
-                } else if(this._x == obj.startMinX && this._y < obj.startMaxY){
-                    this._y = this._y + this._changeNum;
-                    if(this._y > obj.startMaxY) this._y = obj.startMaxY;
-                } else if(this._x < obj.startMaxX && this._y == obj.startMaxY){
-                    this._x = this._x + this._changeNum;
-                    if(this._x > obj.startMaxX) this._x = obj.startMaxX;
-                } else if(this._y <= obj.startMaxY && this._x == obj.startMaxX){
-                    this._y = this._y - this._changeNum;
-                    if(this._y < obj.startMinY) this._y = obj.startMinY;
-                }
-                monster.animate({x:this._x,y:this._y},1);
-            };
-            setInterval(() => {
-                monster._run(_this);
-            },this.speed);
-        }, 500);
+        return {
+            x:x,
+            y:y
+        }
     }
   }
 };
