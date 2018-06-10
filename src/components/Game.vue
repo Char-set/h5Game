@@ -1,17 +1,19 @@
 <template>
-  <div>
+  <div :class="{'shake':defeat}">
       <section class="sectionOne" id="sectionOne">
           <div class="pageOne"></div>
           <div class="bg-star"></div>
           <canvas id="game" class="canvas"></canvas>
           <div class="typeBar">
               <div class="score">X{{killNum}}</div>
-              <div class="time">10秒</div>
+              <div class="time">{{timeCon.down}}秒</div>
           </div>
       </section>
+      <div class="reStart" v-show="showRestart" @click="reStart">重新开始</div>
       <div class="music" :class="{'run':musicState,'stop':!musicState}" @click="toggleVideo">
           <audio src="../../static/video/music.mp3" id="music" preload="auto"></audio>
       </div>
+      <div :class="{'bg':defeat}"></div>
   </div>
 </template>
 
@@ -38,7 +40,13 @@ export default {
       monsters: [], //当前关卡的所有怪物对象,
       dieMonsters: [], //正在死亡的怪物对象
       currentNumber: 0, //生成怪物时，标识当前数量
-      killNum: 0 //杀死怪物的数量
+      killNum: 0, //杀死怪物的数量
+      defeat: false, //未杀死怪物
+      timeCon: {
+        down: 10,
+        interval: ""
+      }, //时间控制
+      showRestart: false //显示重新开始按钮
     };
   },
   mounted: function() {
@@ -171,14 +179,21 @@ export default {
                 (e.y > item._y && e.y < item._y + item._height)
               ) {
                 flag = false;
-                item._die(index, this);
+                item._die(this);
                 this.monsters.splice(index, 1);
                 this.killNum++;
-              } else {
-                //   屏幕抖动
               }
             }
           });
+          if (flag) {
+            this.defeat = true;
+            setTimeout(() => {
+              this.defeat = false;
+            }, 1000);
+          }
+          if (this.monsters.length == 0) {
+            clearInterval(this.timeCon.interval);
+          }
         }
       });
       //   启动游戏，先创建所有关卡
@@ -214,7 +229,6 @@ export default {
         type: random
       });
       this.currentNumber++;
-      console.log(this.currentNumber);
       setTimeout(() => {
         if (this.currentNumber < this.arrNum[this.chapterIndex]) {
           this.creatMonster();
@@ -222,6 +236,34 @@ export default {
           this.currentNumber = 0;
         }
       }, 200);
+      this.initTime();
+    },
+    initTime() {
+      if (this.timeCon.interval) {
+        clearInterval(this.timeCon.interval);
+        this.timeCon.down = 10;
+      }
+      this.timeCon.interval = setInterval(() => {
+        if (this.timeCon.down > 0) {
+          this.timeCon.down--;
+        } else {
+          clearInterval(this.timeCon.interval);
+          this.monsters.forEach(item => {
+            item._die(this, true);
+          });
+          this.monsters = [];
+          alert("时间到了，一共消灭了" + this.killNum + "只怪物");
+          this.showRestart = true;
+        }
+      }, 1000);
+    },
+    reStart() {
+      this.chapterIndex = 0;
+      this.dieMonsters = [];
+      this.killNum = 0;
+      this.monsters = [];
+      this.showRestart = false;
+      this.creatMonster();
     },
     initMonsterNature(option) {
       // 计算每次运动改变的位置大小
@@ -281,7 +323,7 @@ export default {
         monster._runTnterval = setInterval(() => {
           monster._run(_this);
         }, this.speed);
-        monster._die = function(dieIndex, vueObj) {
+        monster._die = function(vueObj, flag) {
           clearInterval(this._runTnterval);
           this.del();
           let dieImgSrc = "";
@@ -331,7 +373,8 @@ export default {
                 vueObj.dieMonsters.splice(0, 1);
                 if (
                   vueObj.dieMonsters.length == 0 &&
-                  vueObj.monsters.length == 0
+                  vueObj.monsters.length == 0 &&
+                  !flag
                 ) {
                   vueObj.chapterIndex++;
                   vueObj.creatMonster();
@@ -386,6 +429,31 @@ section {
   width: 100%;
   height: 100%;
   position: relative;
+}
+.shake {
+  animation: shake 0.4s;
+  animation-iteration-count: infinite;
+}
+.reStart {
+  height: 73px;
+  position: absolute;
+  bottom: 0;
+  right: 150px;
+  z-index: 1000;
+  color: #fff;
+  display: inline-block;
+  line-height: 73px;
+}
+.bg {
+  width: 100%;
+  height: 100%;
+  z-index: 9999;
+  background: rgba(255, 0, 0, 0.3);
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  animation: bg 1s;
+  animation-iteration-count: infinite;
 }
 .sectionOne {
   height: 100vh;
